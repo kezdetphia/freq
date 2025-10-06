@@ -72,6 +72,13 @@ export default function TabLayout() {
             tabBarIcon: ({ color, focused }) => <IconSymbol size={focused ? 28 : 24} name='magnifyingglass' color={color} />,
           }}
         />
+        <Tabs.Screen
+          name='explore'
+          options={{
+            title: 'explore',
+            tabBarIcon: ({ color, focused }) => <IconSymbol size={focused ? 28 : 24} name='magnifyingglass' color={color} />,
+          }}
+        />
       </Tabs>
     </>
   );

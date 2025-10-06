@@ -1,152 +1,100 @@
+import CurrentlyPlayingInterface from '@/components/CurrentlyPlayingInterface';
 import { ScreenWrap } from '@/components/ScreenWrap';
+import { usePlayerStore } from '@/stores/usePlayerStore';
 import { supabase } from '@/utils/supabase';
-import { AudioSource, useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer } from 'expo-audio';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
-import { Button, Card, H3, Spinner, Text, XStack, YStack } from 'tamagui';
+import { FlatList } from 'react-native';
+import { Button, Card, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 
-export default function FrequenciesScreen() {
+export default function ExploreScreen() {
   const [frequencies, setFrequencies] = useState<any[]>([]);
+  const [filteredFrequencies, setFilteredFrequencies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState<string | null>(null);
-  const [userTier, setUserTier] = useState<'free' | 'premium'>('free');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const player = useAudioPlayer();
+  const { setAudioPlayer, playFrequency, selectedId, isPlaying } = usePlayerStore();
 
   useEffect(() => {
+    // Initialize audio player in store
+    setAudioPlayer(player);
     fetchFrequencies();
-    checkUserSubscription();
-
-    return () => {
-      if (player && player.playing) {
-        player.pause();
-      }
-    };
   }, []);
+
+  useEffect(() => {
+    // Filter frequencies based on search
+    if (searchQuery.trim() === '') {
+      setFilteredFrequencies(frequencies);
+    } else {
+      const filtered = frequencies.filter(
+        (freq) =>
+          freq.name.toLowerCase().includes(searchQuery.toLowerCase()) || freq.category?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredFrequencies(filtered);
+    }
+  }, [searchQuery, frequencies]);
 
   const fetchFrequencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('frequencies')
-        .select('*')
-        .eq('is_active', true)
-        .order('is_premium', { ascending: true })
-        .order('name');
+      const { data, error } = await supabase.from('frequencies').select('*').eq('is_active', true).order('name');
 
       if (error) throw error;
 
-      console.log('Fetched frequencies:', data);
+      console.log(`✅ Fetched ${data?.length || 0} frequencies from database`);
       setFrequencies(data || []);
+      setFilteredFrequencies(data || []);
     } catch (error) {
-      console.error('Error fetching frequencies:', error);
-      // Silently fail - no alert for network issues
+      console.error('❌ Error fetching frequencies:', error);
       setFrequencies([]);
+      setFilteredFrequencies([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const checkUserSubscription = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data } = await supabase.from('user_subscriptions').select('subscription_tier').eq('user_id', user.id).single();
-
-        if (data?.subscription_tier === 'premium') {
-          setUserTier('premium');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      // Silently fail - network unavailable
-    }
-  };
-
-  const playFrequency = async (frequency: any) => {
-    console.log('Attempting to play:', frequency.name);
-    console.log('Audio URL:', frequency.audio_url);
-    if (frequency.is_premium && userTier !== 'premium') {
-      Alert.alert('Premium Required', 'Upgrade to Premium to access this frequency');
-      return;
-    }
-
-    if (!frequency.audio_url) {
-      Alert.alert('Audio Not Available', 'This frequency audio is not yet available');
-      return;
-    }
-
-    try {
-      if (playing === frequency.id && player.playing) {
-        player.pause();
-        setPlaying(null);
-        return;
-      }
-
-      console.log('Loading audio from:', frequency.audio_url);
-
-      const audioSource: AudioSource = {
-        uri: frequency.audio_url,
-      };
-
-      await player.replace(audioSource);
-      player.loop = true;
-      player.play();
-
-      setPlaying(frequency.id);
-    } catch (error) {
-      console.error('Error playing frequency:', error);
-      Alert.alert('Error', 'Failed to play this frequency');
-      setPlaying(null);
-    }
+  const handlePlayFrequency = async (frequency: any) => {
+    await playFrequency(frequency);
   };
 
   const renderFrequency = ({ item }: { item: any }) => {
-    const isLocked = item.is_premium && userTier !== 'premium';
-    const isPlaying = playing === item.id;
-    const hasAudio = !!item.audio_url;
+    const isCurrentlyPlaying = selectedId === item.id && isPlaying;
 
     return (
       <Card
         marginHorizontal='$4'
         marginVertical='$2'
         padding='$4'
-        backgroundColor={isLocked ? '$gray2' : '$background'}
-        opacity={isLocked ? 0.7 : 1}
+        backgroundColor='rgba(255, 255, 255, 0.05)'
+        borderColor='rgba(255, 255, 255, 0.1)'
         pressStyle={{ scale: 0.98 }}
-        onPress={() => hasAudio && playFrequency(item)}
+        onPress={() => handlePlayFrequency(item)}
       >
         <XStack justifyContent='space-between' alignItems='center'>
           <YStack flex={1} marginRight='$3'>
-            <XStack alignItems='center' space='$2'>
-              <H3 size='$5'>{item.name}</H3>
-              {item.is_premium && <Icon name='lock' size={16} color={userTier === 'premium' ? '#10b981' : '#6b7280'} />}
-            </XStack>
+            <H3 size='$5' color='#FFFFFF'>
+              {item.name}
+            </H3>
             <Text color='$purple10' fontSize='$3' marginTop='$1'>
-              {item.hz_value} Hz • {item.category}
+              {item.hz_value} Hz{item.category ? ` • ${item.category}` : ''}
             </Text>
-            <Text color='$gray10' fontSize='$2' marginTop='$2'>
+            <Text color='$gray10' fontSize='$2' marginTop='$2' numberOfLines={2}>
               {item.description}
             </Text>
             <Text color='$gray9' fontSize='$1' marginTop='$1'>
-              Duration: {Math.floor(item.duration_seconds / 60)} minutes
+              Tap to play generated tone
             </Text>
-            {!hasAudio && (
-              <Text color='$red10' fontSize='$1' marginTop='$1'>
-                Audio coming soon
-              </Text>
-            )}
           </YStack>
 
           <Button
             size='$4'
             circular
-            backgroundColor={isPlaying ? '$red10' : '$purple10'}
-            disabled={isLocked || !hasAudio}
-            icon={<Icon name={isPlaying ? 'pause' : 'play'} size={20} color='white' />}
+            backgroundColor={isCurrentlyPlaying ? '$red10' : '$purple10'}
+            icon={
+              <Text fontSize='$5' color='#FFFFFF'>
+                {isCurrentlyPlaying ? '⏸' : '▶'}
+              </Text>
+            }
           />
         </XStack>
       </Card>
@@ -166,34 +114,38 @@ export default function FrequenciesScreen() {
   return (
     <ScreenWrap noPadding>
       <YStack flex={1}>
-        <YStack padding='$4' paddingBottom='$2'>
-          <H3 size='$7'>Healing Frequencies</H3>
-          <Text color='$gray10'>Tap to play • Premium frequencies marked with lock</Text>
+        <YStack padding='$4' paddingBottom='$2' pt='$12' gap='$2'>
+          <H3 size='$7' color='#FFFFFF'>
+            Rife Frequencies
+          </H3>
+          <Text color='$gray10'>{frequencies.length} healing frequencies • Tap to play</Text>
+
+          {/* Search Input */}
+          <Input
+            placeholder='Search frequencies...'
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            backgroundColor='rgba(255, 255, 255, 0.1)'
+            borderColor='rgba(255, 255, 255, 0.2)'
+            color='#FFFFFF'
+            placeholderTextColor='rgba(255, 255, 255, 0.5)'
+            marginTop='$2'
+          />
         </YStack>
 
         <FlatList
-          data={frequencies}
+          data={filteredFrequencies}
           keyExtractor={(item) => item.id}
           renderItem={renderFrequency}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          ListEmptyComponent={
+            <YStack padding='$4' alignItems='center'>
+              <Text color='$gray10'>No frequencies found</Text>
+            </YStack>
+          }
         />
-
-        {userTier === 'free' && (
-          <Card
-            backgroundColor='$purple10'
-            margin='$4'
-            padding='$3'
-            pressStyle={{ scale: 0.98 }}
-            onPress={() => {
-              /* Navigate to subscription screen */
-            }}
-          >
-            <Text color='white' textAlign='center' fontWeight='bold'>
-              Unlock All Frequencies - $4.99/month
-            </Text>
-          </Card>
-        )}
       </YStack>
+      <CurrentlyPlayingInterface />
     </ScreenWrap>
   );
 }
