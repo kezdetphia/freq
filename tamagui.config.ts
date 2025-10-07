@@ -7,9 +7,12 @@ const customConfig = createTamagui({
     ...config.themes,
     light: {
       ...config.themes.light,
-      background: '#BFD7EA', // soft bluish
-      color: '#1B1B2F',
-      accent: '#A78BFA', // lavender accent
+      // background: '#BFD7EA', // soft bluish
+      background: '#FFF8E7',
+      // color: '#1B1B2F',
+      color: '#1B1B1B',
+      // accent: '#A78BFA', // lavender accent
+      accent: '#FFB347',
     },
     dark: {
       ...config.themes.dark,

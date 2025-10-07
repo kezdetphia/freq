@@ -1,6 +1,7 @@
 import CurrentlyPlayingInterface from '@/components/CurrentlyPlayingInterface';
 import { ScreenWrap } from '@/components/ScreenWrap';
 import { usePlayerStore } from '@/stores/usePlayerStore';
+import Frequency from '@/types/frequency';
 import { supabase } from '@/utils/supabase';
 import { useAudioPlayer } from 'expo-audio';
 import React, { useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import { FlatList } from 'react-native';
 import { Button, Card, H3, Input, Spinner, Text, XStack, YStack } from 'tamagui';
 
 export default function ExploreScreen() {
-  const [frequencies, setFrequencies] = useState<any[]>([]);
+  const [frequencies, setFrequencies] = useState<Frequency[]>([]);
   const [filteredFrequencies, setFilteredFrequencies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +21,7 @@ export default function ExploreScreen() {
     // Initialize audio player in store
     setAudioPlayer(player);
     fetchFrequencies();
+    console.log('frequencies loaded', frequencies[0]);
   }, []);
 
   useEffect(() => {

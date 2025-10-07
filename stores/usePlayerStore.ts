@@ -4,9 +4,10 @@ import { generateToneDataUri } from '@/utils/frequencyPlayer';
 interface FrequencyData {
   id: string;
   name: string;
-  hz_value: number;
+  hz_value?: number;
   description?: string;
   category?: string;
+  url?: string; // For audio file URLs
 }
 
 interface PlayerState {
@@ -56,26 +57,35 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         return;
       }
 
-      // Parse frequency value
-      const freqValue = parseFloat(frequency.hz_value.toString());
-
-      if (isNaN(freqValue)) {
-        console.error('❌ Invalid frequency value:', frequency.hz_value);
-        return;
-      }
-
       // Stop current playback if any
       if (audioPlayer.playing) {
         audioPlayer.pause();
       }
 
-      console.log(`🎵 Playing: ${frequency.name} (${freqValue} Hz)`);
+      console.log(`🎵 Playing: ${frequency.name}`);
 
-      // Generate tone
-      const dataUri = generateToneDataUri(freqValue, 30);
+      // Determine audio source - use URL if available, otherwise generate tone
+      let audioSource;
+      let freqValue = null;
+
+      if (frequency.url) {
+        // Use audio file from URL
+        audioSource = { uri: frequency.url };
+      } else if (frequency.hz_value) {
+        // Generate tone from hz_value
+        freqValue = parseFloat(frequency.hz_value.toString());
+        if (isNaN(freqValue)) {
+          console.error('❌ Invalid frequency value:', frequency.hz_value);
+          return;
+        }
+        audioSource = { uri: generateToneDataUri(freqValue, 30) };
+      } else {
+        console.error('❌ No audio source available');
+        return;
+      }
 
       // Load and play
-      await audioPlayer.replace({ uri: dataUri });
+      await audioPlayer.replace(audioSource);
       audioPlayer.loop = true;
       audioPlayer.play();
 
@@ -83,11 +93,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
         selectedId: frequency.id,
         name: frequency.name,
-        frequency: freqValue,
+        frequency: freqValue || frequency.hz_value || null,
         isPlaying: true,
       });
 
-      console.log(`✅ Now playing: ${frequency.name} (${freqValue} Hz)`);
+      console.log(`✅ Now playing: ${frequency.name}`);
     } catch (error) {
       console.error('❌ Error playing frequency:', error);
       set({ isPlaying: false });
